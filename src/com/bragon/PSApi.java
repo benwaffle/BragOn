@@ -9,37 +9,31 @@ import android.content.Context;
 import android.widget.Toast;
 
 public class PSApi {
-	private Context ctx;
-	private String server;
-	private PublicPortalServiceJSON login;
+	private Context ctx; // for toasts
+	private PublicPortalServiceJSON soap;
 
-	public PSApi(Context ctx, String server) {
-		this.ctx = ctx;
-		this.server = server;
-
-		Authenticator.setDefault(new Authenticator() {
+	static {
+		Authenticator.setDefault(new Authenticator() { 
 			@Override
 			protected PasswordAuthentication getPasswordAuthentication() {
-				return new PasswordAuthentication("pearson", "m0bApP5"
-						.toCharArray());
+				return new PasswordAuthentication(
+						"pearson", "m0bApP5".toCharArray());
 			}
 		});
-
-		login = new PublicPortalServiceJSON();
-		login.setUrl(server);
+	}
+	
+	public PSApi(Context ctx, String server) {
+		this.ctx = ctx;
+		soap = new PublicPortalServiceJSON();
+		soap.setUrl(server);
 	}
 
-	public boolean login(String username, String password) {
-		ResultsVO res = login.login(username, password, 2, true);
+	public void login(final String username, final String password) {
+		ResultsVO ret = soap.login(username, password, 2, true);
 		
-		if (res == null)
-			Toast.makeText(ctx, "failed to login", Toast.LENGTH_SHORT).show();
+		if (ret == null)
+			Toast.makeText(ctx, "error with powerschool", Toast.LENGTH_LONG).show();
 		else
-			Toast.makeText(ctx,
-					"logged in as " + res.studentDataVOs.firstElement().student.firstName,
-					Toast.LENGTH_SHORT).show();
-
-		return res == null;
-
+			Toast.makeText(ctx, "successful login " + ret, Toast.LENGTH_LONG).show();
 	}
 }
