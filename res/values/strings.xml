@@ -12,5 +12,7 @@
     <string name="facebook">Facebook</string>
     <string name="email">email</string>
     <string name="default_email">you@email.com</string>
+    <string name="app_id">284419148397455</string>
+    <string name="get_started">To get started, log in using Facebook</string>
 
 </resources>

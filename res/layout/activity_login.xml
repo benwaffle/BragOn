@@ -1,11 +1,12 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/LinearLayout1"
+
+	android:id="@+id/LoginActivity"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="10dp"
-    tools:context="${packageName}.${activityClass}" >
+    android:padding="10dp" >
+
 
     <TextView
         android:id="@+id/titleView"
@@ -74,16 +75,22 @@
             android:textAppearance="?android:attr/textAppearanceSmall"
             android:textSize="20sp" />
 
-        <EditText
-            android:id="@+id/fbEmail"
+        <!-- <fragment android:name="com.bragon.SelectionFragment"
+          	android:id="@+id/selectionFragment"
+          	android:layout_width="match_parent"
+          	android:layout_height="match_parent" />
+    	<fragment android:name="com.bragon.SplashFragment"
+          	android:id="@+id/splashFragment"
+          	android:layout_width="match_parent"
+          	android:layout_height="match_parent" />-->
+          	
+          	<EditText
+            android:id="@+id/fbUsername"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:ems="10"
             android:hint="@string/default_email"
-            android:inputType="textEmailAddress" >
-
-            <requestFocus />
-        </EditText>
+            android:maxLines="1" />
 
         <EditText
             android:id="@+id/fbPassword"
@@ -91,7 +98,8 @@
             android:layout_height="wrap_content"
             android:ems="10"
             android:hint="@string/password"
-            android:inputType="textPassword" />
+            android:inputType="textPassword"
+            android:maxLines="1" />
 
         <Button
             android:id="@+id/fbLogin"
