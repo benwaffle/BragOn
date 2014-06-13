@@ -34,7 +34,7 @@ public class LoginActivity extends Activity implements View.OnClickListener {
 			psP.setText(pspass);
 		}
 		
-		psapi = new PSApi(this, "https://ps01.bergen.org");
+		psapi = new PSApi();
 		
 		psLogin.setOnClickListener(this);
 		fbLogin.setOnClickListener(this);
@@ -49,8 +49,16 @@ public class LoginActivity extends Activity implements View.OnClickListener {
 				.putString("pspass", psP.getText().toString())
 				.apply();
 			
-			psapi.login(psU.getText().toString(), psP.getText().toString());
+			if(psapi.login(psU.getText().toString(), psP.getText().toString())){
+				Toast.makeText(this, "success...getting data", Toast.LENGTH_LONG).show();
+				if (psapi.getStudentData() == null)
+					Toast.makeText(this, "failed to get studentData", Toast.LENGTH_LONG).show();
+				else
+					Toast.makeText(this, "successfully got studentData", Toast.LENGTH_LONG).show();
+			} else
+				Toast.makeText(this, "failure", Toast.LENGTH_LONG).show();
 		} else if (v.getId() == R.id.fbLogin) {
+
 		}
 	}
 }

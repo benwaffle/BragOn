@@ -1,112 +1,137 @@
 package com.bragon;
 
-import java.io.BufferedInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
-import java.net.Authenticator;
-import java.net.PasswordAuthentication;
-import java.net.URL;
-import java.nio.ByteBuffer;
+import java.io.StringWriter;
+import java.io.Writer;
+import java.net.URLEncoder;
+import java.util.Arrays;
 
-import javax.net.ssl.HttpsURLConnection;
-
-import org.apache.http.*;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.Credentials;
 import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.client.*;
-import org.apache.http.client.methods.*;
-import org.apache.http.client.protocol.ClientContext;
-import org.apache.http.conn.scheme.*;
-import org.apache.http.conn.ssl.SSLSocketFactory;
-import org.apache.http.entity.*;
-import org.apache.http.impl.client.*;
-import org.apache.http.impl.conn.*;
-import org.apache.http.params.*;
-import org.apache.http.protocol.BasicHttpContext;
-import org.apache.http.protocol.HttpContext;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.client.HttpClient;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.springframework.http.*;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.http.converter.StringHttpMessageConverter;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
 
-import android.content.Context;
-import android.util.Base64;
+import android.os.AsyncTask;
+import android.os.Message;
 import android.util.Log;
-import android.widget.Toast;
 
-import com.Wsdl2Code.WebServices.PublicPortalServiceJSON.PublicPortalServiceJSON;
+import com.bragon.data.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class PSApi {
-	private Context ctx; // for toasts
-	private PublicPortalServiceJSON soap;
+	public static final String BASEURL = "https://ps01.bergen.org/pearson-rest/services/PublicPortalServiceJSON/";
+	public static final String AUTH_U = "pearson", AUTH_P = "m0bApP5";
 
-	final String loginFormat = "<?xml version=\"1.0\" ?><S:Envelope xmlns:S=\"http://schemas.xmlsoap.org/soap/envelope/\"><S:Body><ns2:login xmlns:ns2=\"http://publicportal.rest.powerschool.pearson.com/xsd\"><username>%s</username><password>%s</password><userType>2</userType></ns2:login></S:Body></S:Envelope>";
-
-	public PSApi(Context ctx, String server) {
-		this.ctx = ctx;
-		soap = new PublicPortalServiceJSON();
-		soap.setUrl(server);
+	private RestTemplate rest;
+	private UserSessionVO session; 
+	
+	public PSApi() {
+		System.setProperty("log.tag.RestTemplate", "VERBOSE");
+		rest = new RestTemplate(true, 
+				new HttpComponentsClientHttpRequestFactory(makeAuthClient()));
+		rest.getMessageConverters().add(
+				new MappingJackson2HttpMessageConverter());
+		rest.getMessageConverters().add(
+				new StringHttpMessageConverter());
 	}
 
-	public void login(final String username, final String password) {
-		// ResultsVO ret = soap.login(username, password, 2, true);
-		Object ret = null;
-		try {
-
-			//pearson:m0bApP5
-
-			HttpResponse resp = connect(String.format(loginFormat, username, password), "urn:login");
-			
-			Log.d("com.bragon", "response code: " + resp.getStatusLine().getStatusCode());
-			InputStream is = resp.getEntity().getContent();
-
-			StringBuilder sb = new StringBuilder();
-			byte[] buf = new byte[1024];
-			while (is.read(buf) != -1)
-				sb.append(new String(buf));
-
-			Log.d("com.bragon", "return data: " + sb);
-			
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+	private HttpClient makeAuthClient(){
+		AuthScope scope = new AuthScope("ps01.bergen.org", 443, AuthScope.ANY_REALM);
+		Credentials creds = new UsernamePasswordCredentials(AUTH_U, AUTH_P);
 		
-		if (ret == null)
-			Toast.makeText(ctx, "error with powerschool", Toast.LENGTH_LONG).show();
-		else
-			Toast.makeText(ctx, "successful login " + ret, Toast.LENGTH_LONG).show();
+		CredentialsProvider provider = new BasicCredentialsProvider();
+		provider.setCredentials(scope, creds);
+		
+		DefaultHttpClient client = new DefaultHttpClient();
+		client.setCredentialsProvider(provider);
+		
+		return client;
 	}
-
-	private HttpResponse connect(String data, String soapaction) {
+	
+	public boolean login(final String username, final String password){
 		try {
-			SchemeRegistry schemeRegistry = new SchemeRegistry();
-			schemeRegistry.register(new Scheme("https", SSLSocketFactory.getSocketFactory(), 443));
-			HttpParams params = new BasicHttpParams();
-			SingleClientConnManager mgr = new SingleClientConnManager(params,
-					schemeRegistry);
-
-			HttpClient client = new DefaultHttpClient(mgr, params);
-
-			HttpPost post = new HttpPost("https://ps01.bergen.org/pearson-rest/services/PublicPortalServiceJSON");
-			
-			final AuthScope scope = new AuthScope(post.getURI().getHost(), post.getURI().getPort());
-			final UsernamePasswordCredentials creds = new UsernamePasswordCredentials("pearson", "m0bApP5");
-			HttpContext ctx = new BasicHttpContext(){{
-				setAttribute(ClientContext.CREDS_PROVIDER,
-						new BasicCredentialsProvider(){{
-							setCredentials(scope, creds);
-						}});
-			}};
-			
-			post.setHeader("Content-Type", "text/xml; charset=utf-8");
-			post.setHeader("SOAPAction", "\"" + soapaction + "\"");
-			post.setEntity(new StringEntity(data));
-			
-			return client.execute(post, ctx);
-			
-		} catch (IOException e) {
+			return new AsyncTask<Void, Void, Boolean>() {
+				@Override
+				protected Boolean doInBackground(Void... params) {
+					return loginNet(username, password);
+				}
+			}.execute().get();
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		return false;
+	}
+	
+	private boolean loginNet(final String username, final String password) {
+		String request = "username=" + username + "&password=" + password + "&userType=2&response=application/json";
+		
+		ReturnData sess;
+		
+		try {
+			 sess = rest.getForObject(BASEURL + "login?" + request, ReturnData.class);
+		} catch (RestClientException e) {
+			Log.e("com.bragon","error :(");
+			e.printStackTrace();
+			return false;
+		}
 
-		return null;
+		session = sess.ret.userSessionVO;
+		return true;
+	}
+	
+	public ResultsVO getStudentData(){
+		if (session == null)
+			return null;
+		
+		try {
+			return new AsyncTask<Void, Void, ResultsVO>(){
+				@Override
+				protected ResultsVO doInBackground(Void... params) {
+					return getStudentDataNet();
+				}
+			}.execute().get();
+		} catch (Exception e){
+			return null;
+		}
+	}
+	
+	private ResultsVO getStudentDataNet(){
+		try {
+			ResultsVOWrapper result;
+			try {
+				GetStudentData getData = new GetStudentData();
+				getData.studentIDs = 1L;
+				getData.qil = new QueryIncludeListVO(1);
+				getData.userSessionVO = session;
+				
+				HttpHeaders requestHeaders = new HttpHeaders();
+				requestHeaders.setContentType(new MediaType("application","json"));
+				HttpEntity<GetStudentData> requestEntity = new HttpEntity<GetStudentData>(getData, requestHeaders);
+				
+				result = rest.exchange(BASEURL + "getStudentData?response=application/json",
+						HttpMethod.POST, requestEntity, ResultsVOWrapper.class).getBody();
+//				result = rest.postForObject(BASEURL + "getStudentData?response=application/json", getData, ResultsVOWrapper.class);
+				
+			} catch (Exception e) {
+				e.printStackTrace();
+				return null;
+			}
+			
+			Log.d("com.bragon", "returned: \n" + result);
+			
+			return null;
+		} catch (Exception e){
+			Log.e("com.bragon","error :(");
+			e.printStackTrace();
+			return null;
+		}
 	}
 }
